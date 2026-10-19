@@ -32,6 +32,9 @@ export class Player {
     this.radius = 0.3;
     this.height = 1.7;
 
+    // Blocos que NÃO devem travar o jogador
+    this.nonSolidBlocks = new Set(['water', 'kelp', 'seagrass', 'coral_pink', 'coral_blue']);
+
     this.initControls();
   }
 
@@ -72,7 +75,7 @@ export class Player {
     }
   }
 
-  // Ignora colisão com água e plantas marinhas (kelp, seagrass)
+  // Verifica colisão ignorando água e vegetação aquática
   checkCollisionAt(x, y, z) {
     const minX = Math.floor(x - this.radius);
     const maxX = Math.floor(x + this.radius);
@@ -85,7 +88,7 @@ export class Player {
       for (let by = minY; by <= maxY; by++) {
         for (let bz = minZ; bz <= maxZ; bz++) {
           const block = this.world.getBlock(bx, by, bz);
-          if (block && block !== 'water' && block !== 'kelp' && block !== 'seagrass') {
+          if (block && !this.nonSolidBlocks.has(block)) {
             return true;
           }
         }
@@ -95,6 +98,7 @@ export class Player {
   }
 
   update(delta) {
+    // Detecta submersão na água
     const headX = Math.floor(this.position.x);
     const headZ = Math.floor(this.position.z);
     const surfaceBlock = this.world.getBlock(headX, WATER_LEVEL, headZ);
@@ -109,6 +113,7 @@ export class Player {
     moveDir.normalize();
 
     if (this.isSubmerged) {
+      // --- FÍSICA DE NATAÇÃO 3D ---
       const swimSpeed = this.moveKeys.run ? 9 : 5.5;
 
       const lookVector = new THREE.Vector3(0, 0, -1);
@@ -131,6 +136,7 @@ export class Player {
       this.velocity.y *= Math.pow(0.15, delta);
 
     } else {
+      // --- FÍSICA DE TERRA FIRME ---
       const speed = this.moveKeys.run ? 11 : 6;
 
       moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yawObject.rotation.y);
@@ -146,7 +152,7 @@ export class Player {
       }
     }
 
-    // Resolução de colisão
+    // Aplicação e Resolução de Colisão AABB por Eixo
     const newX = this.position.x + this.velocity.x * delta;
     if (!this.checkCollisionAt(newX, this.position.y, this.position.z)) {
       this.position.x = newX;
