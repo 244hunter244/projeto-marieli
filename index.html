@@ -3,41 +3,31 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sandbox 3D - Edição Navegador</title>
+  <title>Sandbox 3D</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- Caixa de Exibição de Erros -->
-  <div id="error-box"></div>
-
-  <!-- Mira no Centro -->
+  <div id="error-box" style="display:none;"></div>
   <div id="crosshair">+</div>
 
-  <!-- Interface HUD -->
   <div id="ui">
     <h1>🌲 Sandbox 3D</h1>
     <p><b>Controles:</b> Clique para Jogar | WASD para Andar | Espaço para Pular | Shift para Correr</p>
-    <div id="stats">Carregando módulos...</div>
+    <div id="stats">A carregar o mundo...</div>
   </div>
 
-  <!-- Capturador de Erros Detalhado -->
   <script>
-    window.addEventListener('error', function(event) {
-      console.error("❌ ERRO DETECTADO:", event);
+    window.logGameError = function(contexto, erro) {
+      console.error(`❌ [${contexto}]:`, erro);
       const errBox = document.getElementById('error-box');
       if (errBox) {
         errBox.style.display = 'block';
-        const msg = event.message || "Erro desconhecido ao carregar módulo JavaScript.";
-        const src = event.filename ? ` em ${event.filename.split('/').pop()}:${event.lineno}` : "";
-        errBox.innerHTML = `<b>❌ ERRO NO SCRIPT:</b><br>${msg}${src}<br><br><small>Abra o Console (F12) para mais detalhes.</small>`;
+        errBox.innerHTML = `<b>❌ ERRO EM [${contexto}]:</b><br>${erro.message || erro}`;
       }
-    });
+    };
   </script>
 
-  <!-- Bibliotecas externas da Three.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-
-  <!-- Script principal do jogo -->
   <script type="module" src="js/main.js"></script>
 </body>
 </html>
