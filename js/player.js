@@ -70,16 +70,16 @@ export class Player {
   }
 
   update(delta) {
-    // Checa a presença de água diretamente na posição da cabeça/olhos
-    const headBlock = this.world.getBlock(
-      Math.floor(this.position.x),
-      Math.floor(this.position.y),
-      Math.floor(this.position.z)
-    );
+    // Detecta se a câmera/cabeça do jogador está abaixo do nível da água (Y <= 14)
+    // E se não está sob blocos sólidos de terra/pedra acima da água
+    const headX = Math.floor(this.position.x);
+    const headZ = Math.floor(this.position.z);
+    const surfaceBlock = this.world.getBlock(headX, WATER_LEVEL, headZ);
 
-    this.isSubmerged = (headBlock === 'water') && (this.position.y < WATER_LEVEL + 0.2);
+    this.isSubmerged = (this.position.y <= WATER_LEVEL + 0.3) && (surfaceBlock === 'water' || !surfaceBlock);
 
     if (this.isSubmerged) {
+      // --- FÍSICA DE NATAÇÃO DINÂMICA 3D ---
       const swimSpeed = this.moveKeys.run ? 9 : 5.5;
       const moveDir = new THREE.Vector3();
 
@@ -90,26 +90,31 @@ export class Player {
 
       moveDir.normalize();
 
+      // Vetor de visão 3D para mergulhar olhando para baixo ou subir olhando para cima
       const lookVector = new THREE.Vector3(0, 0, -1);
       lookVector.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.pitchObject.rotation.x);
       lookVector.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yawObject.rotation.y);
 
       if (this.moveKeys.forward) {
-        this.velocity.lerp(lookVector.multiplyScalar(swimSpeed), delta * 4);
+        this.velocity.lerp(lookVector.multiplyScalar(swimSpeed), delta * 5);
       } else {
+        // Resposta de amortecimento na água
         this.velocity.x *= Math.pow(0.05, delta);
         this.velocity.z *= Math.pow(0.05, delta);
       }
 
+      // Pular/Subir na água
       if (this.moveKeys.jump) {
-        this.velocity.y = 5;
+        this.velocity.y = 5.5;
       } else if (!this.moveKeys.forward) {
-        this.velocity.y = Math.sin(Date.now() * 0.003) * 0.4;
+        // Flutuação leve e natural ao parar
+        this.velocity.y = Math.sin(Date.now() * 0.003) * 0.3;
       }
 
-      this.velocity.y *= Math.pow(0.1, delta);
+      this.velocity.y *= Math.pow(0.15, delta);
 
     } else {
+      // --- FÍSICA DE TERRA FIRME ---
       const speed = this.moveKeys.run ? 11 : 6;
       const moveDir = new THREE.Vector3();
 
@@ -124,6 +129,7 @@ export class Player {
       this.velocity.x = moveDir.x * speed;
       this.velocity.z = moveDir.z * speed;
 
+      // Gravidade normal
       this.velocity.y -= 26 * delta;
 
       if (this.moveKeys.jump && this.isGrounded) {
@@ -132,10 +138,12 @@ export class Player {
       }
     }
 
+    // Aplicação da velocidade à posição
     this.position.x += this.velocity.x * delta;
     this.position.z += this.velocity.z * delta;
     this.position.y += this.velocity.y * delta;
 
+    // Colisão com o chão
     const feetBlock = this.world.getBlock(
       Math.floor(this.position.x),
       Math.floor(this.position.y - 1.5),
