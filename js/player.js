@@ -6,7 +6,6 @@ export class Player {
     this.domElement = domElement;
     this.world = world;
 
-    // Hierarquia de rotação sem Gimbal Lock
     this.yawObject = new THREE.Object3D();
     this.pitchObject = new THREE.Object3D();
 
@@ -30,9 +29,8 @@ export class Player {
     this.isSubmerged = false;
     this.isLocked = false;
 
-    // Dimensões do AABB do Jogador
-    this.radius = 0.3; // Raio/Largura horizontal do jogador
-    this.height = 1.7; // Altura do jogador
+    this.radius = 0.3;
+    this.height = 1.7;
 
     this.initControls();
   }
@@ -74,12 +72,12 @@ export class Player {
     }
   }
 
-  // Verifica se uma posição colide com algum bloco sólido do mundo
+  // Ignora colisão com água e plantas marinhas (kelp, seagrass)
   checkCollisionAt(x, y, z) {
     const minX = Math.floor(x - this.radius);
     const maxX = Math.floor(x + this.radius);
-    const minY = Math.floor(y - 1.5); // Pés
-    const maxY = Math.floor(y - 1.5 + this.height); // Cabeça
+    const minY = Math.floor(y - 1.5);
+    const maxY = Math.floor(y - 1.5 + this.height);
     const minZ = Math.floor(z - this.radius);
     const maxZ = Math.floor(z + this.radius);
 
@@ -87,7 +85,7 @@ export class Player {
       for (let by = minY; by <= maxY; by++) {
         for (let bz = minZ; bz <= maxZ; bz++) {
           const block = this.world.getBlock(bx, by, bz);
-          if (block && block !== 'water') {
+          if (block && block !== 'water' && block !== 'kelp' && block !== 'seagrass') {
             return true;
           }
         }
@@ -97,14 +95,12 @@ export class Player {
   }
 
   update(delta) {
-    // 1. Checagem de Submersão
     const headX = Math.floor(this.position.x);
     const headZ = Math.floor(this.position.z);
     const surfaceBlock = this.world.getBlock(headX, WATER_LEVEL, headZ);
 
     this.isSubmerged = (this.position.y <= WATER_LEVEL + 0.3) && (surfaceBlock === 'water' || !surfaceBlock);
 
-    // 2. Cálculo da Direção de Movimento
     const moveDir = new THREE.Vector3();
     if (this.moveKeys.forward) moveDir.z -= 1;
     if (this.moveKeys.backward) moveDir.z += 1;
@@ -113,7 +109,6 @@ export class Player {
     moveDir.normalize();
 
     if (this.isSubmerged) {
-      // --- FÍSICA DE NATAÇÃO ---
       const swimSpeed = this.moveKeys.run ? 9 : 5.5;
 
       const lookVector = new THREE.Vector3(0, 0, -1);
@@ -136,7 +131,6 @@ export class Player {
       this.velocity.y *= Math.pow(0.15, delta);
 
     } else {
-      // --- FÍSICA DE TERRA FIRME ---
       const speed = this.moveKeys.run ? 11 : 6;
 
       moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yawObject.rotation.y);
@@ -144,7 +138,6 @@ export class Player {
       this.velocity.x = moveDir.x * speed;
       this.velocity.z = moveDir.z * speed;
 
-      // Gravidade
       this.velocity.y -= 26 * delta;
 
       if (this.moveKeys.jump && this.isGrounded) {
@@ -153,9 +146,7 @@ export class Player {
       }
     }
 
-    // 3. RESOLUÇÃO DE COLISÃO EIXO POR EIXO (AABB)
-
-    // Eixo X
+    // Resolução de colisão
     const newX = this.position.x + this.velocity.x * delta;
     if (!this.checkCollisionAt(newX, this.position.y, this.position.z)) {
       this.position.x = newX;
@@ -163,7 +154,6 @@ export class Player {
       this.velocity.x = 0;
     }
 
-    // Eixo Z
     const newZ = this.position.z + this.velocity.z * delta;
     if (!this.checkCollisionAt(this.position.x, this.position.y, newZ)) {
       this.position.z = newZ;
@@ -171,20 +161,17 @@ export class Player {
       this.velocity.z = 0;
     }
 
-    // Eixo Y (Vertical / Pulo / Gravidade)
     const newY = this.position.y + this.velocity.y * delta;
     if (!this.checkCollisionAt(this.position.x, newY, this.position.z)) {
       this.position.y = newY;
       this.isGrounded = false;
     } else {
-      // Colisão ao cair (Pés no chão) ou bater a cabeça
       if (this.velocity.y < 0) {
         this.isGrounded = true;
       }
       this.velocity.y = 0;
     }
 
-    // Teletransporte de segurança em caso de queda fora do mapa
     if (this.position.y < -10) {
       this.position.set(8, 35, 8);
       this.velocity.set(0, 0, 0);

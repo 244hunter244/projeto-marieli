@@ -2,8 +2,9 @@ import { WorldManager } from './world.js';
 import { Player } from './player.js';
 import { waterUniforms, initMaterials } from './textures.js';
 import { SkyManager } from './sky.js';
+import { CharacterManager } from './character.js';
 
-console.log("🚀 Inicializando Sandbox 3D com fundo do mar bioma marinho completo...");
+console.log("🚀 Inicializando Sandbox 3D com modelo Steve e braço 1ª Pessoa...");
 
 document.querySelectorAll('canvas').forEach(c => c.remove());
 
@@ -61,6 +62,9 @@ const skyManager = new SkyManager(scene);
 const world = new WorldManager(scene, 2);
 const player = new Player(camera, renderer.domElement, world);
 
+// Inicializa o modelo 3D do personagem e braço
+const character = new CharacterManager(scene, camera);
+
 const clock = new THREE.Clock();
 
 function animate() {
@@ -76,7 +80,10 @@ function animate() {
   world.update(player.position);
   skyManager.update(delta, player.position);
 
-  // --- CONTROLE DE AMBIENTE SUBAQUÁTICO ---
+  // Atualiza animações do braço e modelo do personagem
+  character.update(delta, player.position, player.velocity, player.isGrounded, player.isSubmerged);
+
+  // Controle do ambiente aquático
   if (player.isSubmerged) {
     scene.background = underwaterColor;
     scene.fog.color = underwaterColor;
