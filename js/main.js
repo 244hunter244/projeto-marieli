@@ -3,15 +3,14 @@ import { Player } from './player.js';
 import { waterUniforms, initMaterials } from './textures.js';
 import { SkyManager } from './sky.js';
 
-console.log("🚀 Inicializando Sandbox 3D com ambiente aquático completo...");
+console.log("🚀 Inicializando Sandbox 3D com fundo do mar bioma marinho completo...");
 
 document.querySelectorAll('canvas').forEach(c => c.remove());
 
 initMaterials();
 
 const scene = new THREE.Scene();
-const skyColor = new THREE.Color('#87ceeb');
-const underwaterColor = new THREE.Color('#0b4f8a');
+const underwaterColor = new THREE.Color('#0e68a3');
 
 scene.fog = new THREE.FogExp2('#b8d5e5', 0.008);
 
@@ -35,23 +34,23 @@ sunLight.position.set(120, 220, -200);
 scene.add(sunLight);
 
 // --- PARTÍCULAS DE BOLHAS SUBAQUÁTICAS ---
-const bubbleCount = 70;
+const bubbleCount = 80;
 const bubbleGeometry = new THREE.BufferGeometry();
 const bubblePositions = new Float32Array(bubbleCount * 3);
 
 for (let i = 0; i < bubbleCount * 3; i += 3) {
-  bubblePositions[i] = (Math.random() - 0.5) * 16;
+  bubblePositions[i] = (Math.random() - 0.5) * 18;
   bubblePositions[i + 1] = Math.random() * 8;
-  bubblePositions[i + 2] = (Math.random() - 0.5) * 16;
+  bubblePositions[i + 2] = (Math.random() - 0.5) * 18;
 }
 
 bubbleGeometry.setAttribute('position', new THREE.BufferAttribute(bubblePositions, 3));
 
 const bubbleMaterial = new THREE.PointsMaterial({
-  color: 0xffffff,
+  color: 0xddffff,
   size: 0.18,
   transparent: true,
-  opacity: 0.75
+  opacity: 0.8
 });
 
 const bubbleParticles = new THREE.Points(bubbleGeometry, bubbleMaterial);
@@ -77,18 +76,18 @@ function animate() {
   world.update(player.position);
   skyManager.update(delta, player.position);
 
-  // --- ALTERNÂNCIA DE AMBIENTE SUBAQUÁTICO ---
+  // --- CONTROLE DE AMBIENTE SUBAQUÁTICO ---
   if (player.isSubmerged) {
     scene.background = underwaterColor;
     scene.fog.color = underwaterColor;
-    scene.fog.density = 0.045; // Névoa azul densa debaixo d'água
+    scene.fog.density = 0.038;
 
     bubbleParticles.visible = true;
     bubbleParticles.position.copy(player.position);
 
     const positions = bubbleGeometry.attributes.position.array;
     for (let i = 1; i < bubbleCount * 3; i += 3) {
-      positions[i] += delta * 3.0;
+      positions[i] += delta * 2.8;
       if (positions[i] > 5) positions[i] = -3;
     }
     bubbleGeometry.attributes.position.needsUpdate = true;

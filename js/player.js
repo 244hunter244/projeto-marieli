@@ -6,6 +6,7 @@ export class Player {
     this.domElement = domElement;
     this.world = world;
 
+    // Hierarquia de rotação sem Gimbal Lock
     this.yawObject = new THREE.Object3D();
     this.pitchObject = new THREE.Object3D();
 
@@ -28,6 +29,10 @@ export class Player {
     this.isGrounded = false;
     this.isSubmerged = false;
     this.isLocked = false;
+
+    // Dimensões do AABB do Jogador
+    this.radius = 0.3; // Raio/Largura horizontal do jogador
+    this.height = 1.7; // Altura do jogador
 
     this.initControls();
   }
@@ -69,28 +74,48 @@ export class Player {
     }
   }
 
+  // Verifica se uma posição colide com algum bloco sólido do mundo
+  checkCollisionAt(x, y, z) {
+    const minX = Math.floor(x - this.radius);
+    const maxX = Math.floor(x + this.radius);
+    const minY = Math.floor(y - 1.5); // Pés
+    const maxY = Math.floor(y - 1.5 + this.height); // Cabeça
+    const minZ = Math.floor(z - this.radius);
+    const maxZ = Math.floor(z + this.radius);
+
+    for (let bx = minX; bx <= maxX; bx++) {
+      for (let by = minY; by <= maxY; by++) {
+        for (let bz = minZ; bz <= maxZ; bz++) {
+          const block = this.world.getBlock(bx, by, bz);
+          if (block && block !== 'water') {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
   update(delta) {
-    // Detecta se a câmera/cabeça do jogador está abaixo do nível da água (Y <= 14)
-    // E se não está sob blocos sólidos de terra/pedra acima da água
+    // 1. Checagem de Submersão
     const headX = Math.floor(this.position.x);
     const headZ = Math.floor(this.position.z);
     const surfaceBlock = this.world.getBlock(headX, WATER_LEVEL, headZ);
 
     this.isSubmerged = (this.position.y <= WATER_LEVEL + 0.3) && (surfaceBlock === 'water' || !surfaceBlock);
 
+    // 2. Cálculo da Direção de Movimento
+    const moveDir = new THREE.Vector3();
+    if (this.moveKeys.forward) moveDir.z -= 1;
+    if (this.moveKeys.backward) moveDir.z += 1;
+    if (this.moveKeys.left) moveDir.x -= 1;
+    if (this.moveKeys.right) moveDir.x += 1;
+    moveDir.normalize();
+
     if (this.isSubmerged) {
-      // --- FÍSICA DE NATAÇÃO DINÂMICA 3D ---
+      // --- FÍSICA DE NATAÇÃO ---
       const swimSpeed = this.moveKeys.run ? 9 : 5.5;
-      const moveDir = new THREE.Vector3();
 
-      if (this.moveKeys.forward) moveDir.z -= 1;
-      if (this.moveKeys.backward) moveDir.z += 1;
-      if (this.moveKeys.left) moveDir.x -= 1;
-      if (this.moveKeys.right) moveDir.x += 1;
-
-      moveDir.normalize();
-
-      // Vetor de visão 3D para mergulhar olhando para baixo ou subir olhando para cima
       const lookVector = new THREE.Vector3(0, 0, -1);
       lookVector.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.pitchObject.rotation.x);
       lookVector.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yawObject.rotation.y);
@@ -98,16 +123,13 @@ export class Player {
       if (this.moveKeys.forward) {
         this.velocity.lerp(lookVector.multiplyScalar(swimSpeed), delta * 5);
       } else {
-        // Resposta de amortecimento na água
         this.velocity.x *= Math.pow(0.05, delta);
         this.velocity.z *= Math.pow(0.05, delta);
       }
 
-      // Pular/Subir na água
       if (this.moveKeys.jump) {
         this.velocity.y = 5.5;
       } else if (!this.moveKeys.forward) {
-        // Flutuação leve e natural ao parar
         this.velocity.y = Math.sin(Date.now() * 0.003) * 0.3;
       }
 
@@ -116,20 +138,13 @@ export class Player {
     } else {
       // --- FÍSICA DE TERRA FIRME ---
       const speed = this.moveKeys.run ? 11 : 6;
-      const moveDir = new THREE.Vector3();
 
-      if (this.moveKeys.forward) moveDir.z -= 1;
-      if (this.moveKeys.backward) moveDir.z += 1;
-      if (this.moveKeys.left) moveDir.x -= 1;
-      if (this.moveKeys.right) moveDir.x += 1;
-
-      moveDir.normalize();
       moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yawObject.rotation.y);
 
       this.velocity.x = moveDir.x * speed;
       this.velocity.z = moveDir.z * speed;
 
-      // Gravidade normal
+      // Gravidade
       this.velocity.y -= 26 * delta;
 
       if (this.moveKeys.jump && this.isGrounded) {
@@ -138,26 +153,38 @@ export class Player {
       }
     }
 
-    // Aplicação da velocidade à posição
-    this.position.x += this.velocity.x * delta;
-    this.position.z += this.velocity.z * delta;
-    this.position.y += this.velocity.y * delta;
+    // 3. RESOLUÇÃO DE COLISÃO EIXO POR EIXO (AABB)
 
-    // Colisão com o chão
-    const feetBlock = this.world.getBlock(
-      Math.floor(this.position.x),
-      Math.floor(this.position.y - 1.5),
-      Math.floor(this.position.z)
-    );
-
-    if (feetBlock && feetBlock !== 'water') {
-      this.position.y = Math.floor(this.position.y - 1.5) + 2.5;
-      this.velocity.y = 0;
-      this.isGrounded = true;
+    // Eixo X
+    const newX = this.position.x + this.velocity.x * delta;
+    if (!this.checkCollisionAt(newX, this.position.y, this.position.z)) {
+      this.position.x = newX;
     } else {
-      this.isGrounded = false;
+      this.velocity.x = 0;
     }
 
+    // Eixo Z
+    const newZ = this.position.z + this.velocity.z * delta;
+    if (!this.checkCollisionAt(this.position.x, this.position.y, newZ)) {
+      this.position.z = newZ;
+    } else {
+      this.velocity.z = 0;
+    }
+
+    // Eixo Y (Vertical / Pulo / Gravidade)
+    const newY = this.position.y + this.velocity.y * delta;
+    if (!this.checkCollisionAt(this.position.x, newY, this.position.z)) {
+      this.position.y = newY;
+      this.isGrounded = false;
+    } else {
+      // Colisão ao cair (Pés no chão) ou bater a cabeça
+      if (this.velocity.y < 0) {
+        this.isGrounded = true;
+      }
+      this.velocity.y = 0;
+    }
+
+    // Teletransporte de segurança em caso de queda fora do mapa
     if (this.position.y < -10) {
       this.position.set(8, 35, 8);
       this.velocity.set(0, 0, 0);

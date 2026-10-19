@@ -21,7 +21,6 @@ export class Chunk {
 
   generateTerrainData() {
     const treePositions = [];
-    const kelpPositions = [];
 
     for (let x = 0; x < CHUNK_SIZE; x++) {
       for (let z = 0; z < CHUNK_SIZE; z++) {
@@ -38,6 +37,7 @@ export class Chunk {
 
         const isUnderWater = height < WATER_LEVEL;
 
+        // Gera o terreno sólido até a altura máxima
         for (let y = 0; y <= height; y++) {
           let type = 'dirt';
           if (y === height) {
@@ -49,16 +49,34 @@ export class Chunk {
           this.blocksData.set(`${worldX},${y},${worldZ}`, type);
         }
 
+        // Elementos Subaquáticos
         if (isUnderWater) {
+          // Lâmina de água na superfície
           this.blocksData.set(`${worldX},${WATER_LEVEL},${worldZ}`, 'water');
 
-          // Chance de gerar algas crescendo no fundo do lago
-          const kelpNoise = simplex.noise2D(worldX * 0.2, worldZ * 0.2);
-          if (kelpNoise > 0.35 && WATER_LEVEL - height >= 3) {
-            kelpPositions.push({ x: worldX, minY: height + 1, maxY: WATER_LEVEL - 1 });
+          // Geração aleatória simples e direta de plantas na areia
+          const plantSeed = Math.abs(simplex.noise2D(worldX * 0.4, worldZ * 0.4));
+          const depth = WATER_LEVEL - height;
+
+          if (depth >= 2) {
+            if (plantSeed > 0.6) {
+              // Alga Alta (Kelp)
+              const kelpHeight = Math.min(depth - 1, Math.floor(2 + plantSeed * 4));
+              for (let ky = 1; ky <= kelpHeight; ky++) {
+                this.blocksData.set(`${worldX},${height + ky},${worldZ}`, 'kelp');
+              }
+            } else if (plantSeed > 0.35) {
+              // Erva Marinha
+              this.blocksData.set(`${worldX},${height + 1},${worldZ}`, 'seagrass');
+            } else if (plantSeed < 0.15) {
+              // Corais Rosa / Azul
+              const coral = (plantSeed > 0.07) ? 'coral_pink' : 'coral_blue';
+              this.blocksData.set(`${worldX},${height + 1},${worldZ}`, coral);
+            }
           }
         }
 
+        // Árvores na terra firme
         if (height > WATER_LEVEL + 1 && (x > 2 && x < CHUNK_SIZE - 2 && z > 2 && z < CHUNK_SIZE - 2)) {
           const treeChance = simplex.noise2D(worldX * 0.5, worldZ * 0.5);
           if (treeChance > 0.75) {
@@ -68,15 +86,7 @@ export class Chunk {
       }
     }
 
-    // Criar Algas (Kelp)
-    for (const kelp of kelpPositions) {
-      const kelpHeight = Math.floor(1 + Math.random() * (kelp.maxY - kelp.minY));
-      for (let y = 0; y < kelpHeight; y++) {
-        this.blocksData.set(`${kelp.x},${kelp.minY + y},${kelp.z}`, 'kelp');
-      }
-    }
-
-    // Criar Árvores
+    // Instanciação das Árvores
     for (const tree of treePositions) {
       const trunkHeight = 4 + Math.floor(Math.random() * 2);
       for (let y = 0; y < trunkHeight; y++) {
@@ -109,7 +119,11 @@ export class Chunk {
   buildMesh() {
     this.clearMesh();
 
-    const blocksByType = { grass: [], dirt: [], stone: [], sand: [], kelp: [], log: [], leaves: [], water: [] };
+    const blocksByType = {
+      grass: [], dirt: [], stone: [], sand: [],
+      kelp: [], seagrass: [], coral_pink: [], coral_blue: [],
+      log: [], leaves: [], water: []
+    };
 
     for (const [key, type] of this.blocksData.entries()) {
       const [x, y, z] = key.split(',').map(Number);
@@ -123,7 +137,7 @@ export class Chunk {
     else if (this.lodState === 2) matSet = solidMaterials;
 
     const dummy = new THREE.Object3D();
-    const typesOrder = ['dirt', 'stone', 'sand', 'grass', 'kelp', 'log', 'leaves', 'water'];
+    const typesOrder = ['dirt', 'stone', 'sand', 'grass', 'coral_pink', 'coral_blue', 'seagrass', 'kelp', 'log', 'leaves', 'water'];
 
     for (const type of typesOrder) {
       const list = blocksByType[type];
