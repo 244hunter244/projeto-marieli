@@ -49,13 +49,12 @@ export class Chunk {
           this.blocksData.set(`${worldX},${y},${worldZ}`, type);
         }
 
-        // Superfície da água
         if (isUnderWater) {
           this.blocksData.set(`${worldX},${WATER_LEVEL},${worldZ}`, 'water');
 
-          // Chance de nascer algas marinhas no fundo do rio
+          // Chance de gerar algas crescendo no fundo do lago
           const kelpNoise = simplex.noise2D(worldX * 0.2, worldZ * 0.2);
-          if (kelpNoise > 0.4 && WATER_LEVEL - height >= 3) {
+          if (kelpNoise > 0.35 && WATER_LEVEL - height >= 3) {
             kelpPositions.push({ x: worldX, minY: height + 1, maxY: WATER_LEVEL - 1 });
           }
         }
@@ -69,7 +68,7 @@ export class Chunk {
       }
     }
 
-    // Gerar Algas (Kelp)
+    // Criar Algas (Kelp)
     for (const kelp of kelpPositions) {
       const kelpHeight = Math.floor(1 + Math.random() * (kelp.maxY - kelp.minY));
       for (let y = 0; y < kelpHeight; y++) {
@@ -77,7 +76,7 @@ export class Chunk {
       }
     }
 
-    // Gerar Árvores
+    // Criar Árvores
     for (const tree of treePositions) {
       const trunkHeight = 4 + Math.floor(Math.random() * 2);
       for (let y = 0; y < trunkHeight; y++) {
