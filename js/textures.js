@@ -19,20 +19,33 @@ export function initMaterials() {
     return texture;
   };
 
+  // 1. Grama - Topo
   const grassTopTex = createTexture((ctx) => {
     ctx.fillStyle = '#4c812b';
     ctx.fillRect(0, 0, 32, 32);
     ctx.fillStyle = '#3f6c23';
     for (let i = 0; i < 90; i++) ctx.fillRect(Math.floor(Math.random() * 32), Math.floor(Math.random() * 32), 2, 2);
+    ctx.fillStyle = '#5b9933';
+    for (let i = 0; i < 60; i++) ctx.fillRect(Math.floor(Math.random() * 32), Math.floor(Math.random() * 32), 2, 2);
   });
 
+  // 2. Grama - Lateral (Verde no topo, Terra embaixo)
   const grassSideTex = createTexture((ctx) => {
     ctx.fillStyle = '#80593f';
     ctx.fillRect(0, 0, 32, 32);
+    ctx.fillStyle = '#6a4933';
+    for (let i = 0; i < 80; i++) ctx.fillRect(Math.floor(Math.random() * 32), Math.floor(Math.random() * 32), 2, 2);
     ctx.fillStyle = '#4c812b';
     ctx.fillRect(0, 0, 32, 6);
+    for (let x = 0; x < 32; x += 2) {
+      const drop = 6 + Math.floor(Math.random() * 5);
+      ctx.fillRect(x, 6, 2, drop - 6);
+    }
+    ctx.fillStyle = '#5b9933';
+    for (let x = 0; x < 32; x += 4) ctx.fillRect(x, 0, 2, 4);
   });
 
+  // 3. Terra
   const dirtTex = createTexture((ctx) => {
     ctx.fillStyle = '#80593f';
     ctx.fillRect(0, 0, 32, 32);
@@ -40,6 +53,7 @@ export function initMaterials() {
     for (let i = 0; i < 90; i++) ctx.fillRect(Math.floor(Math.random() * 32), Math.floor(Math.random() * 32), 2, 2);
   });
 
+  // 4. Pedra
   const stoneTex = createTexture((ctx) => {
     ctx.fillStyle = '#737373';
     ctx.fillRect(0, 0, 32, 32);
@@ -47,6 +61,7 @@ export function initMaterials() {
     for (let i = 0; i < 80; i++) ctx.fillRect(Math.floor(Math.random() * 32), Math.floor(Math.random() * 32), 2, 2);
   });
 
+  // 5. Areia
   const sandTex = createTexture((ctx) => {
     ctx.fillStyle = '#e5c180';
     ctx.fillRect(0, 0, 32, 32);
@@ -54,20 +69,29 @@ export function initMaterials() {
     for (let i = 0; i < 90; i++) ctx.fillRect(Math.floor(Math.random() * 32), Math.floor(Math.random() * 32), 2, 2);
   });
 
-  const kelpTex = createTexture((ctx) => {
+  // 6. Alga (Planta em Cruz)
+  const kelpPlantTex = createTexture((ctx) => {
+    ctx.clearRect(0, 0, 32, 32);
     ctx.fillStyle = '#1e7530';
-    ctx.fillRect(0, 0, 32, 32);
+    ctx.fillRect(14, 0, 4, 32);
     ctx.fillStyle = '#2bb047';
-    for (let i = 0; i < 60; i++) ctx.fillRect(Math.floor(Math.random() * 32), Math.floor(Math.random() * 32), 2, 2);
+    for (let y = 2; y < 30; y += 6) {
+      ctx.fillRect(8, y, 6, 3);
+      ctx.fillRect(18, y + 3, 6, 3);
+    }
   });
 
-  const seagrassTex = createTexture((ctx) => {
+  // 7. Erva Marinha (Planta em Cruz)
+  const seagrassPlantTex = createTexture((ctx) => {
+    ctx.clearRect(0, 0, 32, 32);
     ctx.fillStyle = '#3aa34a';
-    ctx.fillRect(0, 0, 32, 32);
+    ctx.fillRect(10, 10, 3, 22);
+    ctx.fillRect(18, 6, 3, 26);
     ctx.fillStyle = '#257031';
-    for (let i = 0; i < 60; i++) ctx.fillRect(Math.floor(Math.random() * 32), Math.floor(Math.random() * 32), 2, 2);
+    ctx.fillRect(14, 14, 3, 18);
   });
 
+  // 8. Corais Rosa e Azul
   const coralPinkTex = createTexture((ctx) => {
     ctx.fillStyle = '#e64a88';
     ctx.fillRect(0, 0, 32, 32);
@@ -82,6 +106,7 @@ export function initMaterials() {
     for (let i = 0; i < 60; i++) ctx.fillRect(Math.floor(Math.random() * 32), Math.floor(Math.random() * 32), 2, 2);
   });
 
+  // 9. Tronco
   const logSideTex = createTexture((ctx) => {
     ctx.fillStyle = '#5c4333';
     ctx.fillRect(0, 0, 32, 32);
@@ -96,6 +121,7 @@ export function initMaterials() {
     ctx.fillRect(13, 13, 6, 6);
   });
 
+  // 10. Folhas
   const leavesTex = createTexture((ctx) => {
     ctx.fillStyle = '#2b571e';
     ctx.fillRect(0, 0, 32, 32);
@@ -103,6 +129,7 @@ export function initMaterials() {
     for (let i = 0; i < 100; i++) ctx.fillRect(Math.floor(Math.random() * 32), Math.floor(Math.random() * 32), 2, 2);
   });
 
+  // Shader da Água
   const globalWaterShader = new THREE.ShaderMaterial({
     uniforms: waterUniforms,
     vertexShader: `
@@ -152,8 +179,8 @@ export function initMaterials() {
   const matStone = new THREE.MeshStandardMaterial({ map: stoneTex, roughness: 0.6 });
   const matSand = new THREE.MeshStandardMaterial({ map: sandTex, roughness: 0.9 });
 
-  const matKelp = new THREE.MeshStandardMaterial({ map: kelpTex, roughness: 0.4, transparent: true, opacity: 0.9 });
-  const matSeagrass = new THREE.MeshStandardMaterial({ map: seagrassTex, roughness: 0.5, transparent: true, opacity: 0.88 });
+  const matKelp = new THREE.MeshStandardMaterial({ map: kelpPlantTex, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide });
+  const matSeagrass = new THREE.MeshStandardMaterial({ map: seagrassPlantTex, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide });
   const matCoralPink = new THREE.MeshStandardMaterial({ map: coralPinkTex, roughness: 0.6 });
   const matCoralBlue = new THREE.MeshStandardMaterial({ map: coralBlueTex, roughness: 0.6 });
 
@@ -189,8 +216,8 @@ export function initMaterials() {
   solidMaterials.dirt = new THREE.MeshLambertMaterial({ color: 0x80593f });
   solidMaterials.stone = new THREE.MeshLambertMaterial({ color: 0x737373 });
   solidMaterials.sand = new THREE.MeshLambertMaterial({ color: 0xe5c180 });
-  solidMaterials.kelp = new THREE.MeshLambertMaterial({ color: 0x1e7530 });
-  solidMaterials.seagrass = new THREE.MeshLambertMaterial({ color: 0x3aa34a });
+  solidMaterials.kelp = matKelp;
+  solidMaterials.seagrass = matSeagrass;
   solidMaterials.coral_pink = new THREE.MeshLambertMaterial({ color: 0xe64a88 });
   solidMaterials.coral_blue = new THREE.MeshLambertMaterial({ color: 0x329de6 });
   solidMaterials.log = new THREE.MeshLambertMaterial({ color: 0x5c4333 });

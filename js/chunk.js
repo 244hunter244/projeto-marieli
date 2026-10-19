@@ -7,6 +7,30 @@ export const WATER_LEVEL = 14;
 const simplex = new SimplexNoise();
 const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
 
+function createPlantGeometry() {
+  const geom = new THREE.BufferGeometry();
+  const vertices = new Float32Array([
+    -0.4, 0, -0.4,   0.4, 0,  0.4,   0.4, 1,  0.4,
+    -0.4, 0, -0.4,   0.4, 1,  0.4,  -0.4, 1, -0.4,
+    -0.4, 0,  0.4,   0.4, 0, -0.4,   0.4, 1, -0.4,
+    -0.4, 0,  0.4,   0.4, 1, -0.4,  -0.4, 1,  0.4,
+  ]);
+
+  const uvs = new Float32Array([
+    0, 0,  1, 0,  1, 1,
+    0, 0,  1, 1,  0, 1,
+    0, 0,  1, 0,  1, 1,
+    0, 0,  1, 1,  0, 1,
+  ]);
+
+  geom.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+  geom.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  geom.computeVertexNormals();
+  return geom;
+}
+
+const plantGeometry = createPlantGeometry();
+
 export class Chunk {
   constructor(cx, cz, scene) {
     this.cx = cx;
@@ -37,7 +61,6 @@ export class Chunk {
 
         const isUnderWater = height < WATER_LEVEL;
 
-        // Gera o terreno sólido até a altura máxima
         for (let y = 0; y <= height; y++) {
           let type = 'dirt';
           if (y === height) {
@@ -49,34 +72,27 @@ export class Chunk {
           this.blocksData.set(`${worldX},${y},${worldZ}`, type);
         }
 
-        // Elementos Subaquáticos
         if (isUnderWater) {
-          // Lâmina de água na superfície
           this.blocksData.set(`${worldX},${WATER_LEVEL},${worldZ}`, 'water');
 
-          // Geração aleatória simples e direta de plantas na areia
-          const plantSeed = Math.abs(simplex.noise2D(worldX * 0.4, worldZ * 0.4));
+          const plantSeed = simplex.noise2D(worldX * 0.35, worldZ * 0.35);
           const depth = WATER_LEVEL - height;
 
           if (depth >= 2) {
-            if (plantSeed > 0.6) {
-              // Alga Alta (Kelp)
-              const kelpHeight = Math.min(depth - 1, Math.floor(2 + plantSeed * 4));
+            if (plantSeed > 0.72) {
+              const kelpHeight = Math.min(depth - 1, Math.floor(2 + Math.random() * 3));
               for (let ky = 1; ky <= kelpHeight; ky++) {
                 this.blocksData.set(`${worldX},${height + ky},${worldZ}`, 'kelp');
               }
-            } else if (plantSeed > 0.35) {
-              // Erva Marinha
+            } else if (plantSeed > 0.58) {
               this.blocksData.set(`${worldX},${height + 1},${worldZ}`, 'seagrass');
-            } else if (plantSeed < 0.15) {
-              // Corais Rosa / Azul
-              const coral = (plantSeed > 0.07) ? 'coral_pink' : 'coral_blue';
+            } else if (plantSeed < -0.6) {
+              const coral = (plantSeed > -0.8) ? 'coral_pink' : 'coral_blue';
               this.blocksData.set(`${worldX},${height + 1},${worldZ}`, coral);
             }
           }
         }
 
-        // Árvores na terra firme
         if (height > WATER_LEVEL + 1 && (x > 2 && x < CHUNK_SIZE - 2 && z > 2 && z < CHUNK_SIZE - 2)) {
           const treeChance = simplex.noise2D(worldX * 0.5, worldZ * 0.5);
           if (treeChance > 0.75) {
@@ -86,7 +102,6 @@ export class Chunk {
       }
     }
 
-    // Instanciação das Árvores
     for (const tree of treePositions) {
       const trunkHeight = 4 + Math.floor(Math.random() * 2);
       for (let y = 0; y < trunkHeight; y++) {
@@ -146,8 +161,11 @@ export class Chunk {
       const mat = matSet[type];
       if (!mat) continue;
 
-      const imesh = new THREE.InstancedMesh(boxGeometry, mat, list.length);
-      imesh.castShadow = (this.lodState === 0) && (type !== 'water');
+      const isPlant = (type === 'kelp' || type === 'seagrass');
+      const useGeo = isPlant ? plantGeometry : boxGeometry;
+
+      const imesh = new THREE.InstancedMesh(useGeo, mat, list.length);
+      imesh.castShadow = (this.lodState === 0) && (type !== 'water') && !isPlant;
       imesh.receiveShadow = (this.lodState === 0);
 
       if (type === 'water') {
@@ -156,7 +174,11 @@ export class Chunk {
 
       for (let i = 0; i < list.length; i++) {
         const b = list[i];
-        dummy.position.set(b.x, b.y, b.z);
+        if (isPlant) {
+          dummy.position.set(b.x, b.y - 0.5, b.z);
+        } else {
+          dummy.position.set(b.x, b.y, b.z);
+        }
         dummy.updateMatrix();
         imesh.setMatrixAt(i, dummy.matrix);
       }
