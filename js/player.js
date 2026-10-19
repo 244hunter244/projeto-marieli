@@ -1,16 +1,32 @@
+import { WATER_LEVEL } from './chunk.js';
+
 export class Player {
   constructor(camera, domElement, world) {
     this.camera = camera;
     this.domElement = domElement;
     this.world = world;
 
-    // Posição inicial no centro do mapa acima da altura máxima do terreno
-    this.position = new THREE.Vector3(8, 30, 8);
-    this.velocity = new THREE.Vector3();
-    this.camera.position.copy(this.position);
+    this.yawObject = new THREE.Object3D();
+    this.pitchObject = new THREE.Object3D();
 
+    this.pitchObject.add(this.camera);
+    this.yawObject.add(this.pitchObject);
+
+    this.camera.rotation.set(0, 0, 0);
+    this.pitchObject.rotation.set(0, 0, 0);
+    this.yawObject.rotation.set(0, 0, 0);
+
+    this.position = this.yawObject.position;
+    this.position.set(8, 35, 8);
+
+    if (this.world && this.world.scene) {
+      this.world.scene.add(this.yawObject);
+    }
+
+    this.velocity = new THREE.Vector3();
     this.moveKeys = { forward: false, backward: false, left: false, right: false, jump: false, run: false };
     this.isGrounded = false;
+    this.isSubmerged = false;
     this.isLocked = false;
 
     this.initControls();
@@ -29,10 +45,13 @@ export class Player {
 
     document.addEventListener('mousemove', (e) => {
       if (!this.isLocked) return;
-      const sensitivity = 0.002;
-      this.camera.rotation.y -= e.movementX * sensitivity;
-      this.camera.rotation.x -= e.movementY * sensitivity;
-      this.camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, this.camera.rotation.x));
+
+      const sensitivity = 0.0022;
+      this.yawObject.rotation.y -= e.movementX * sensitivity;
+      this.pitchObject.rotation.x -= e.movementY * sensitivity;
+
+      const maxAngle = Math.PI / 2 - 0.01;
+      this.pitchObject.rotation.x = Math.max(-maxAngle, Math.min(maxAngle, this.pitchObject.rotation.x));
     });
 
     window.addEventListener('keydown', (e) => this.handleKey(e.code, true));
@@ -51,35 +70,88 @@ export class Player {
   }
 
   update(delta) {
-    const speed = this.moveKeys.run ? 12 : 6;
-    const moveDir = new THREE.Vector3();
+    // Detecção da água na posição atual
+    const currentBlock = this.world.getBlock(
+      Math.floor(this.position.x),
+      Math.floor(this.position.y - 0.5),
+      Math.floor(this.position.z)
+    );
 
-    if (this.moveKeys.forward) moveDir.z -= 1;
-    if (this.moveKeys.backward) moveDir.z += 1;
-    if (this.moveKeys.left) moveDir.x -= 1;
-    if (this.moveKeys.right) moveDir.x += 1;
+    this.isSubmerged = (currentBlock === 'water') || (this.position.y < WATER_LEVEL + 0.5);
 
-    moveDir.normalize();
-    moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.camera.rotation.y);
+    if (this.isSubmerged) {
+      // --- FÍSICA DE NATAÇÃO DINÂMICA 3D ---
+      const swimSpeed = this.moveKeys.run ? 9 : 5.5;
+      const moveDir = new THREE.Vector3();
 
-    this.velocity.x = moveDir.x * speed;
-    this.velocity.z = moveDir.z * speed;
+      if (this.moveKeys.forward) moveDir.z -= 1;
+      if (this.moveKeys.backward) moveDir.z += 1;
+      if (this.moveKeys.left) moveDir.x -= 1;
+      if (this.moveKeys.right) moveDir.x += 1;
 
-    // Gravidade
-    this.velocity.y -= 20 * delta;
+      moveDir.normalize();
 
-    if (this.moveKeys.jump && this.isGrounded) {
-      this.velocity.y = 8;
-      this.isGrounded = false;
+      // Direção da natação orientada pela câmara (inclui mergulho ao olhar para baixo/cima)
+      const lookVector = new THREE.Vector3(0, 0, -1);
+      lookVector.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.pitchObject.rotation.x);
+      lookVector.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yawObject.rotation.y);
+
+      if (this.moveKeys.forward) {
+        this.velocity.lerp(lookVector.multiplyScalar(swimSpeed), delta * 4);
+      } else {
+        // Amortecimento hidráulico (atrito na água)
+        this.velocity.x *= Math.pow(0.05, delta);
+        this.velocity.z *= Math.pow(0.05, delta);
+      }
+
+      // Controlo vertical e empuxo na água
+      if (this.moveKeys.jump) {
+        this.velocity.y = 5; // Subir
+      } else if (!this.moveKeys.forward) {
+        // Flutuação natural
+        this.velocity.y = Math.sin(Date.now() * 0.003) * 0.4;
+      }
+
+      this.velocity.y *= Math.pow(0.1, delta);
+
+    } else {
+      // --- FÍSICA DE TERRA FIRME ---
+      const speed = this.moveKeys.run ? 11 : 6;
+      const moveDir = new THREE.Vector3();
+
+      if (this.moveKeys.forward) moveDir.z -= 1;
+      if (this.moveKeys.backward) moveDir.z += 1;
+      if (this.moveKeys.left) moveDir.x -= 1;
+      if (this.moveKeys.right) moveDir.x += 1;
+
+      moveDir.normalize();
+      moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yawObject.rotation.y);
+
+      this.velocity.x = moveDir.x * speed;
+      this.velocity.z = moveDir.z * speed;
+
+      // Gravidade
+      this.velocity.y -= 26 * delta;
+
+      if (this.moveKeys.jump && this.isGrounded) {
+        this.velocity.y = 8.5;
+        this.isGrounded = false;
+      }
     }
 
+    // Aplicação da Posição
     this.position.x += this.velocity.x * delta;
     this.position.z += this.velocity.z * delta;
     this.position.y += this.velocity.y * delta;
 
-    // Checa colisão simples com o chão
-    const groundBlock = this.world.getBlock(this.position.x, this.position.y - 1.5, this.position.z);
-    if (groundBlock) {
+    // Colisão com terreno sólido
+    const feetBlock = this.world.getBlock(
+      Math.floor(this.position.x),
+      Math.floor(this.position.y - 1.5),
+      Math.floor(this.position.z)
+    );
+
+    if (feetBlock && feetBlock !== 'water') {
       this.position.y = Math.floor(this.position.y - 1.5) + 2.5;
       this.velocity.y = 0;
       this.isGrounded = true;
@@ -87,12 +159,9 @@ export class Player {
       this.isGrounded = false;
     }
 
-    // Se cair no vazio, reinicia a posição no alto
     if (this.position.y < -10) {
-      this.position.set(8, 30, 8);
+      this.position.set(8, 35, 8);
       this.velocity.set(0, 0, 0);
     }
-
-    this.camera.position.copy(this.position);
   }
 }

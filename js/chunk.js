@@ -1,8 +1,8 @@
 import { SimplexNoise } from './noise.js';
-import { blockMaterials, solidMaterials } from './textures.js';
+import { blockMaterialsHD, blockMaterialsSD, solidMaterials } from './textures.js';
 
 export const CHUNK_SIZE = 16;
-export const CHUNK_HEIGHT = 64;
+export const WATER_LEVEL = 14;
 
 const simplex = new SimplexNoise();
 const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
@@ -14,41 +14,82 @@ export class Chunk {
     this.scene = scene;
     this.blocksData = new Map();
     this.instancedMeshes = [];
-    this.hasTexture = true;
+    this.lodState = -1;
 
     this.generateTerrainData();
   }
 
   generateTerrainData() {
+    const treePositions = [];
+
     for (let x = 0; x < CHUNK_SIZE; x++) {
       for (let z = 0; z < CHUNK_SIZE; z++) {
         const worldX = this.cx * CHUNK_SIZE + x;
         const worldZ = this.cz * CHUNK_SIZE + z;
 
-        const n = simplex.noise2D(worldX * 0.015, worldZ * 0.015);
-        const height = Math.floor(15 + n * 10);
+        const baseNoise = simplex.noise2D(worldX * 0.015, worldZ * 0.015);
+        const riverNoise = Math.abs(simplex.noise2D(worldX * 0.03 + 50, worldZ * 0.03 + 50));
+        
+        let height = Math.floor(18 + baseNoise * 12);
+        if (riverNoise < 0.15) {
+          height -= Math.floor((0.15 - riverNoise) * 25);
+        }
 
-        for (let y = 0; y <= height; y++) {
-          let type = 'dirt';
-          if (y === height) type = 'grass';
-          else if (y < height - 3) type = 'stone';
+        for (let y = 0; y <= Math.max(height, WATER_LEVEL); y++) {
+          if (y <= height) {
+            let type = 'dirt';
+            if (y === height) type = (height <= WATER_LEVEL) ? 'dirt' : 'grass';
+            else if (y < height - 3) type = 'stone';
 
-          this.blocksData.set(`${worldX},${y},${worldZ}`, type);
+            this.blocksData.set(`${worldX},${y},${worldZ}`, type);
+          } else if (y <= WATER_LEVEL) {
+            // Desenha apenas a água exposta ou necessária
+            this.blocksData.set(`${worldX},${y},${worldZ}`, 'water');
+          }
+        }
+
+        if (height > WATER_LEVEL + 1 && (x > 2 && x < CHUNK_SIZE - 2 && z > 2 && z < CHUNK_SIZE - 2)) {
+          const treeChance = simplex.noise2D(worldX * 0.5, worldZ * 0.5);
+          if (treeChance > 0.75) {
+            treePositions.push({ x: worldX, y: height + 1, z: worldZ });
+          }
+        }
+      }
+    }
+
+    for (const tree of treePositions) {
+      const trunkHeight = 4 + Math.floor(Math.random() * 2);
+      for (let y = 0; y < trunkHeight; y++) {
+        this.blocksData.set(`${tree.x},${tree.y + y},${tree.z}`, 'log');
+      }
+
+      const topY = tree.y + trunkHeight - 1;
+      for (let lx = -2; lx <= 2; lx++) {
+        for (let lz = -2; lz <= 2; lz++) {
+          for (let ly = 0; ly <= 2; ly++) {
+            if (Math.abs(lx) === 2 && Math.abs(lz) === 2 && ly === 2) continue;
+            const fx = tree.x + lx;
+            const fy = topY + ly;
+            const fz = tree.z + lz;
+            if (!this.blocksData.has(`${fx},${fy},${fz}`)) {
+              this.blocksData.set(`${fx},${fy},${fz}`, 'leaves');
+            }
+          }
         }
       }
     }
   }
 
-  setLODMode(useTexture) {
-    if (this.hasTexture === useTexture && this.instancedMeshes.length > 0) return;
-    this.hasTexture = useTexture;
+  setLODMode(lodLevel) {
+    if (this.lodState === lodLevel && this.instancedMeshes.length > 0) return;
+    this.lodState = lodLevel;
     this.buildMesh();
   }
 
   buildMesh() {
     this.clearMesh();
 
-    const blocksByType = { grass: [], dirt: [], stone: [] };
+    const blocksByType = { grass: [], dirt: [], stone: [], log: [], leaves: [], water: [] };
 
     for (const [key, type] of this.blocksData.entries()) {
       const [x, y, z] = key.split(',').map(Number);
@@ -57,19 +98,29 @@ export class Chunk {
       }
     }
 
-    const matSet = this.hasTexture ? blockMaterials : solidMaterials;
+    let matSet = blockMaterialsHD;
+    if (this.lodState === 1) matSet = blockMaterialsSD;
+    else if (this.lodState === 2) matSet = solidMaterials;
+
     const dummy = new THREE.Object3D();
 
-    for (const type in blocksByType) {
+    // Renderiza primeiro os blocos sólidos
+    const typesOrder = ['dirt', 'stone', 'grass', 'log', 'leaves', 'water'];
+
+    for (const type of typesOrder) {
       const list = blocksByType[type];
-      if (list.length === 0) continue;
+      if (!list || list.length === 0) continue;
 
       const mat = matSet[type];
       if (!mat) continue;
 
       const imesh = new THREE.InstancedMesh(boxGeometry, mat, list.length);
-      imesh.castShadow = true;
-      imesh.receiveShadow = true;
+      imesh.castShadow = (this.lodState === 0) && (type !== 'water');
+      imesh.receiveShadow = (this.lodState === 0);
+
+      if (type === 'water') {
+        imesh.renderOrder = 1; // Garante que a água é desenhada após a geometria sólida
+      }
 
       for (let i = 0; i < list.length; i++) {
         const b = list[i];

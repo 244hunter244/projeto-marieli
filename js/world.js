@@ -1,10 +1,9 @@
 import { Chunk, CHUNK_SIZE } from './chunk.js';
 
 export class WorldManager {
-  constructor(scene, renderDistance = 2, textureRadius = 1) {
+  constructor(scene, renderDistance = 2) {
     this.scene = scene;
     this.renderDistance = renderDistance;
-    this.textureRadius = textureRadius;
     this.loadedChunks = new Map();
   }
 
@@ -24,8 +23,8 @@ export class WorldManager {
     const currentChunkZ = Math.floor(cameraPosition.z / CHUNK_SIZE);
 
     const neededChunkKeys = new Set();
-    let texturedCount = 0;
-    let solidCount = 0;
+    let hdCount = 0;
+    let sdCount = 0;
 
     for (let x = -this.renderDistance; x <= this.renderDistance; x++) {
       for (let z = -this.renderDistance; z <= this.renderDistance; z++) {
@@ -35,18 +34,27 @@ export class WorldManager {
         neededChunkKeys.add(key);
 
         const chunkDistance = Math.max(Math.abs(x), Math.abs(z));
-        const shouldHaveTexture = chunkDistance <= this.textureRadius;
-
-        if (shouldHaveTexture) texturedCount++;
-        else solidCount++;
+        
+        // Define o nível de textura baseado na distância do jogador:
+        // 0 = Chunk atual do jogador (Texturas HD com Sombras)
+        // 1 = Chunks vizinhas (Texturas SD)
+        // 2 = Chunks distantes (Cor sólida)
+        let lodLevel = 2;
+        if (chunkDistance === 0) {
+          lodLevel = 0;
+          hdCount++;
+        } else if (chunkDistance === 1) {
+          lodLevel = 1;
+          sdCount++;
+        }
 
         if (!this.loadedChunks.has(key)) {
           const newChunk = new Chunk(cx, cz, this.scene);
-          newChunk.setLODMode(shouldHaveTexture);
+          newChunk.setLODMode(lodLevel);
           this.loadedChunks.set(key, newChunk);
         } else {
           const chunk = this.loadedChunks.get(key);
-          if (chunk) chunk.setLODMode(shouldHaveTexture);
+          if (chunk) chunk.setLODMode(lodLevel);
         }
       }
     }
@@ -62,8 +70,8 @@ export class WorldManager {
     if (statsElem) {
       statsElem.innerHTML = 
         `Chunk Atual: [${currentChunkX}, ${currentChunkZ}]<br>` +
-        `🎨 Chunks c/ Textura (≤ 1): <b>${texturedCount}</b><br>` +
-        `⚡ Chunks Cor Sólida (> 1): <b>${solidCount}</b><br>` +
+        `🌟 Chunk HD (Atual): <b>${hdCount}</b><br>` +
+        `🎨 Chunks SD (Vizinhas): <b>${sdCount}</b><br>` +
         `📦 Total na GPU: <b>${this.loadedChunks.size} chunks</b>`;
     }
   }
