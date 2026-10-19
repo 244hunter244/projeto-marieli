@@ -35,17 +35,19 @@ export class Chunk {
           height -= Math.floor((0.15 - riverNoise) * 25);
         }
 
-        for (let y = 0; y <= Math.max(height, WATER_LEVEL); y++) {
-          if (y <= height) {
-            let type = 'dirt';
-            if (y === height) type = (height <= WATER_LEVEL) ? 'dirt' : 'grass';
-            else if (y < height - 3) type = 'stone';
+        // Gera o terreno sólido até a altura máxima calculada
+        for (let y = 0; y <= height; y++) {
+          let type = 'dirt';
+          if (y === height) type = (height <= WATER_LEVEL) ? 'dirt' : 'grass';
+          else if (y < height - 3) type = 'stone';
 
-            this.blocksData.set(`${worldX},${y},${worldZ}`, type);
-          } else if (y <= WATER_LEVEL) {
-            // Desenha apenas a água exposta ou necessária
-            this.blocksData.set(`${worldX},${y},${worldZ}`, 'water');
-          }
+          this.blocksData.set(`${worldX},${y},${worldZ}`, type);
+        }
+
+        // ATENÇÃO: Adiciona apenas UM bloco de água no topo do rio (WATER_LEVEL)
+        // Isso impede a formação do "emaranhado" de cubos internos por baixo
+        if (height < WATER_LEVEL) {
+          this.blocksData.set(`${worldX},${WATER_LEVEL},${worldZ}`, 'water');
         }
 
         if (height > WATER_LEVEL + 1 && (x > 2 && x < CHUNK_SIZE - 2 && z > 2 && z < CHUNK_SIZE - 2)) {
@@ -103,8 +105,6 @@ export class Chunk {
     else if (this.lodState === 2) matSet = solidMaterials;
 
     const dummy = new THREE.Object3D();
-
-    // Renderiza primeiro os blocos sólidos
     const typesOrder = ['dirt', 'stone', 'grass', 'log', 'leaves', 'water'];
 
     for (const type of typesOrder) {
@@ -119,7 +119,7 @@ export class Chunk {
       imesh.receiveShadow = (this.lodState === 0);
 
       if (type === 'water') {
-        imesh.renderOrder = 1; // Garante que a água é desenhada após a geometria sólida
+        imesh.renderOrder = 2; // Renderizado por cima para manter a superfície limpa
       }
 
       for (let i = 0; i < list.length; i++) {

@@ -52,22 +52,60 @@ export function initMaterials() {
   const logTex = createHDTexture('log_side');
   const leavesTex = createHDTexture('leaves');
 
-  // Ajuste do material de água para evitar z-fighting e transparências duplicadas
-  const waterMaterialHD = new THREE.MeshPhysicalMaterial({
-    color: 0x3399ff,
+  // Shader da Água HD: Superfície Lisa, Ondulada e Opaca (Impede ver cubos por baixo)
+  const waterShaderHD = new THREE.ShaderMaterial({
+    uniforms: waterUniforms,
+    vertexShader: `
+      uniform float uTime;
+      varying vec3 vWorldPosition;
+      varying vec3 vNormal;
+
+      void main() {
+        vNormal = normalMatrix * normal;
+        vec4 worldPos = instanceMatrix * vec4(position, 1.0);
+        
+        // Deforma suavemente a superfície sem quebrar as laterais
+        if (position.y > 0.4) {
+          float wave = sin(worldPos.x * 1.5 + uTime * 2.0) * cos(worldPos.z * 1.5 + uTime * 1.8) * 0.06;
+          worldPos.y += wave;
+        }
+
+        vWorldPosition = worldPos.xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * worldPos;
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      varying vec3 vWorldPosition;
+      varying vec3 vNormal;
+
+      void main() {
+        // Tom azul profundo e realista de água de jogo 3D
+        vec3 deepBlue = vec3(0.08, 0.45, 0.88);
+        vec3 brightBlue = vec3(0.2, 0.65, 0.98);
+        
+        // Padrão de ondas procedurais no topo
+        float wavePattern = sin(vWorldPosition.x * 3.0 + uTime * 2.0) * cos(vWorldPosition.z * 3.0 + uTime * 2.0);
+        vec3 waterColor = mix(deepBlue, brightBlue, wavePattern * 0.25 + 0.5);
+
+        // Brilho especular de luz na água
+        vec3 lightDirection = normalize(vec3(0.4, 1.0, 0.4));
+        float specular = pow(max(dot(reflect(-lightDirection, vNormal), vec3(0.0, 0.0, 1.0)), 0.0), 32.0);
+        waterColor += vec3(0.5) * specular;
+
+        // Opacidade alta (0.95) para esconder totalmente os blocos do fundo
+        gl_FragColor = vec4(waterColor, 0.95);
+      }
+    `,
     transparent: true,
-    opacity: 0.6,
-    roughness: 0.1,
-    transmission: 0.6,
-    thickness: 1.2,
-    depthWrite: false
+    depthWrite: true
   });
 
-  const waterMaterialSD = new THREE.MeshStandardMaterial({
-    color: 0x3399ff,
-    transparent: true,
-    opacity: 0.55,
-    depthWrite: false
+  // Água simples para chunks distantes
+  const simpleWater = new THREE.MeshLambertMaterial({
+    color: 0x1e78dd,
+    opacity: 0.95,
+    transparent: false
   });
 
   blockMaterialsHD.grass = new THREE.MeshStandardMaterial({ map: grassTex, roughness: 0.6 });
@@ -75,19 +113,19 @@ export function initMaterials() {
   blockMaterialsHD.stone = new THREE.MeshStandardMaterial({ map: stoneTex, roughness: 0.5 });
   blockMaterialsHD.log = new THREE.MeshStandardMaterial({ map: logTex, roughness: 0.7 });
   blockMaterialsHD.leaves = new THREE.MeshStandardMaterial({ map: leavesTex, roughness: 0.5, transparent: true, opacity: 0.9 });
-  blockMaterialsHD.water = waterMaterialHD;
+  blockMaterialsHD.water = waterShaderHD;
 
   blockMaterialsSD.grass = new THREE.MeshLambertMaterial({ map: grassTex });
   blockMaterialsSD.dirt = new THREE.MeshLambertMaterial({ map: dirtTex });
   blockMaterialsSD.stone = new THREE.MeshLambertMaterial({ map: stoneTex });
   blockMaterialsSD.log = new THREE.MeshLambertMaterial({ map: logTex });
   blockMaterialsSD.leaves = new THREE.MeshLambertMaterial({ map: leavesTex, transparent: true, opacity: 0.9 });
-  blockMaterialsSD.water = waterMaterialSD;
+  blockMaterialsSD.water = simpleWater;
 
   solidMaterials.grass = new THREE.MeshLambertMaterial({ color: 0x5c8e32 });
   solidMaterials.dirt = new THREE.MeshLambertMaterial({ color: 0x866043 });
   solidMaterials.stone = new THREE.MeshLambertMaterial({ color: 0x7a7a7a });
   solidMaterials.log = new THREE.MeshLambertMaterial({ color: 0x674d3c });
   solidMaterials.leaves = new THREE.MeshLambertMaterial({ color: 0x2e5a1c });
-  solidMaterials.water = waterMaterialSD;
+  solidMaterials.water = simpleWater;
 }
