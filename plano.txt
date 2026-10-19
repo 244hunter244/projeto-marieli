@@ -1,0 +1,207 @@
+========================================================================
+
+                 SANDBOX 3D - DOCUMENTAÇÃO DO PROJETO
+
+========================================================================
+
+
+
+Este documento contém a explicação detalhada da arquitetura modular do 
+
+motor gráfico 3D voxel desenvolvido com Three.js e JavaScript (ES Modules).
+
+
+
+------------------------------------------------------------------------
+
+1. ESTRUTURA DE PASTA DO PROJETO
+
+------------------------------------------------------------------------
+
+
+
+meu-sandbox-3d/
+
+├── index.html        # Página principal e ponto de entrada HTML
+
+├── style.css         # Estilização da interface, HUD e caixa de erro
+
+├── plano.txt         # Documentação e plano da arquitetura do projeto
+
+└── js/
+
+    ├── noise.js      # Algoritmos de ruído procedural (Relevo e Rios)
+
+    ├── textures.js   # Texturas pixel-art, materiais e Shader de Água
+
+    ├── chunk.js      # Estrutura de blocos, culling e malhas de 1 Chunk
+
+    ├── world.js      # Gerenciador do mundo (Carregamento e LOD)
+
+    └── main.js       # Loop principal, Three.js, câmera e iluminação
+
+
+
+------------------------------------------------------------------------
+
+2. EXPLICAÇÃO DETALHADA DOS ARQUIVOS
+
+------------------------------------------------------------------------
+
+
+
+📄 index.html
+
+------------------------------------------------------------------------
+
+• Função: Estrutura HTML do projeto.
+
+• Responsabilidades:
+
+  - Carrega a folha de estilo (style.css).
+
+  - Define os elementos da HUD (mira central, título e caixa de status).
+
+  - Inclui um contêiner (#error-box) com um script inline de captura global 
+
+    de erros para evitar "tela preta" silenciosa.
+
+  - Carrega as bibliotecas externas via CDN (Three.js e OrbitControls).
+
+  - Importa o script principal como módulo ES6 (<script type="module" src="js/main.js">).
+
+
+
+
+
+🎨 style.css
+
+------------------------------------------------------------------------
+
+• Função: Estilização visual e layout da interface (UI).
+
+• Responsabilidades:
+
+  - Garante que a tela do canvas ocupe 100% da viewport (100vw x 100vh) sem barras de rolagem.
+
+  - Estiliza o HUD flutuante (#ui) com fundo semi-transparente e efeito de desfoque (glassmorphism).
+
+  - Estiliza a mira no centro da tela (#crosshair).
+
+  - Define o visual de alerta vermelho da caixa de erros (#error-box).
+
+
+
+
+
+🧠 js/noise.js
+
+------------------------------------------------------------------------
+
+• Função: Motor de geração procedural do terreno.
+
+• Responsabilidades:
+
+  - Implementa o algoritmo Simplex Noise 2D para gerar variações suaves e elevatórias no relevo.
+
+  - Disponibiliza a função 'riverNoise', baseada em Ridged Noise, responsável por cavar 
+
+    vales e leitos de rios estreitos no terreno de forma orgânica.
+
+
+
+
+
+🎨 js/textures.js
+
+------------------------------------------------------------------------
+
+• Função: Gerenciador de materiais, texturas pixel-art e shaders gráficos.
+
+• Responsabilidades:
+
+  - 'createPixelTexture': Gera em memória (Canvas 2D) texturas procedural estilo pixel-art (16x16).
+
+  - 'realisticWaterMaterial': Shader customizado (GLSL) que simula água com transparência, 
+
+    movimento de ondas dinâmicas, brilho especular do sol e efeito de espuma.
+
+  - 'texturedMaterials': Conjunto de materiais com textura pixel-art para chunks próximos (LOD alto).
+
+  - 'solidColorMaterials': Conjunto de materiais simplificados com cores sólidas (sem amostragem 
+
+    de textura) para chunks distantes, otimizando o desempenho da GPU (LOD baixo).
+
+
+
+
+
+🧱 js/chunk.js
+
+------------------------------------------------------------------------
+
+• Função: Representação matemática e gráfica de uma região de 16x16 blocos.
+
+• Responsabilidades:
+
+  - Define a distribuição de blocos (pedra, terra, grama, areia, minérios, madeira e folhas) 
+
+    com base nas funções de ruído e na altura da água (WATER_LEVEL = 8).
+
+  - 'isBlockHidden': Aplica Hidden Face Culling descartando blocos subterrâneos invisíveis 
+
+    para economizar o processamento de geometria.
+
+  - 'setLODMode': Alterna dinamicamente entre o modo com textura e o modo de cor sólida.
+
+  - Constrói as malhas utilizando 'THREE.InstancedMesh' para renderizar milhares de blocos em 
+
+    uma única chamada de desenho (Draw Call).
+
+
+
+
+
+🌐 js/world.js
+
+------------------------------------------------------------------------
+
+• Função: Gerenciador global do mundo e distância de visão (Render Distance).
+
+• Responsabilidades:
+
+  - Monitora a posição da câmera e calcula em qual chunk o jogador está localizado.
+
+  - Carrega novos chunks e descarta (dispose) os chunks distantes da visão para liberar memória.
+
+  - Aplica o LOD de Texturas: Chunks em um raio ≤ 2 recebem materiais com textura detalhada, 
+
+    enquanto chunks em raio > 2 utilizam cores sólidas.
+
+  - Atualiza as estatísticas em tempo real na tela do usuário.
+
+
+
+
+
+🚀 js/main.js
+
+------------------------------------------------------------------------
+
+• Função: Ponto de entrada (Entry Point) da aplicação.
+
+• Responsabilidades:
+
+  - Configura a cena 3D do Three.js, o renderizador WebGL, a névoa (Fog) e a câmera perspectivada.
+
+  - Adiciona e configura as luzes ambiente e direcional com suporte a sombras suaves.
+
+  - Instancia os controles de câmera (OrbitControls) e o gerenciador do mundo (WorldManager).
+
+  - Executa o loop principal de renderização (requestAnimationFrame), atualizando o tempo do 
+
+    shader de água (waterUniforms.uTime) e a posição do mundo a cada frame.
+
+
+
+========================================================================
