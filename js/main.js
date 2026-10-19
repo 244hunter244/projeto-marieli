@@ -67,7 +67,7 @@ let world = null;
 let player = null;
 
 try {
-  world = new WorldManager(scene, 4, 2);
+  world = new WorldManager(scene, 2, 1);
   const domTarget = renderer ? renderer.domElement : document.body;
   player = new Player(camera, domTarget, world);
 } catch (e) {

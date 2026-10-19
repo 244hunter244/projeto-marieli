@@ -1,7 +1,8 @@
 import { Chunk, CHUNK_SIZE } from './chunk.js';
 
 export class WorldManager {
-  constructor(scene, renderDistance = 4, textureRadius = 2) {
+  // Alterado renderDistance de 4 para 2 e textureRadius de 2 para 1
+  constructor(scene, renderDistance = 2, textureRadius = 1) {
     try {
       this.scene = scene;
       this.renderDistance = renderDistance;
@@ -21,7 +22,7 @@ export class WorldManager {
       const chunk = this.loadedChunks.get(key);
       if (!chunk) return null;
 
-      return chunk.blocksData.get(`${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`) || null;
+      return chunk.blocksData ? (chunk.blocksData.get(`${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`) || null) : null;
     } catch (e) {
       if (window.logGameError) window.logGameError("world.js -> getBlock", e);
       return null;
@@ -56,14 +57,18 @@ export class WorldManager {
             this.loadedChunks.set(key, newChunk);
           } else {
             const chunk = this.loadedChunks.get(key);
-            chunk.setLODMode(shouldHaveTexture);
+            if (chunk && typeof chunk.setLODMode === 'function') {
+              chunk.setLODMode(shouldHaveTexture);
+            }
           }
         }
       }
 
       for (const [key, chunk] of this.loadedChunks.entries()) {
         if (!neededChunkKeys.has(key)) {
-          chunk.dispose();
+          if (chunk && typeof chunk.dispose === 'function') {
+            chunk.dispose();
+          }
           this.loadedChunks.delete(key);
         }
       }
@@ -72,8 +77,8 @@ export class WorldManager {
       if (statsElem) {
         statsElem.innerHTML = 
           `Chunk Atual: [${currentChunkX}, ${currentChunkZ}]<br>` +
-          `🎨 Chunks c/ Textura (≤ 2): <b>${texturedCount}</b><br>` +
-          `⚡ Chunks Cor Sólida (> 2): <b>${solidCount}</b><br>` +
+          `🎨 Chunks c/ Textura (≤ 1): <b>${texturedCount}</b><br>` +
+          `⚡ Chunks Cor Sólida (> 1): <b>${solidCount}</b><br>` +
           `📦 Total na GPU: <b>${this.loadedChunks.size} chunks</b>`;
       }
     } catch (e) {
