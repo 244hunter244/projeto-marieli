@@ -81,7 +81,15 @@ function animate() {
   skyManager.update(delta, player.position);
 
   // Atualiza animações do braço e modelo do personagem
-  character.update(delta, player.position, player.velocity, player.isGrounded, player.isSubmerged);
+  character.update(
+    delta,
+    player.position,
+    player.velocity,
+    player.yawObject.rotation.y,   // Passa a rotação horizontal da câmera
+    player.pitchObject.rotation.x, // Passa a inclinação vertical da cabeça
+    player.isGrounded,
+    player.isSubmerged
+  );
 
   // Controle do ambiente aquático
   if (player.isSubmerged) {
