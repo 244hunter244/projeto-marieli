@@ -21,6 +21,7 @@ export class Chunk {
 
   generateTerrainData() {
     const treePositions = [];
+    const kelpPositions = [];
 
     for (let x = 0; x < CHUNK_SIZE; x++) {
       for (let z = 0; z < CHUNK_SIZE; z++) {
@@ -35,19 +36,28 @@ export class Chunk {
           height -= Math.floor((0.15 - riverNoise) * 25);
         }
 
-        // Gera o terreno sólido até a altura máxima calculada
+        const isUnderWater = height < WATER_LEVEL;
+
         for (let y = 0; y <= height; y++) {
           let type = 'dirt';
-          if (y === height) type = (height <= WATER_LEVEL) ? 'dirt' : 'grass';
-          else if (y < height - 3) type = 'stone';
+          if (y === height) {
+            type = isUnderWater ? 'sand' : 'grass';
+          } else if (y < height - 3) {
+            type = 'stone';
+          }
 
           this.blocksData.set(`${worldX},${y},${worldZ}`, type);
         }
 
-        // ATENÇÃO: Adiciona apenas UM bloco de água no topo do rio (WATER_LEVEL)
-        // Isso impede a formação do "emaranhado" de cubos internos por baixo
-        if (height < WATER_LEVEL) {
+        // Superfície da água
+        if (isUnderWater) {
           this.blocksData.set(`${worldX},${WATER_LEVEL},${worldZ}`, 'water');
+
+          // Chance de nascer algas marinhas no fundo do rio
+          const kelpNoise = simplex.noise2D(worldX * 0.2, worldZ * 0.2);
+          if (kelpNoise > 0.4 && WATER_LEVEL - height >= 3) {
+            kelpPositions.push({ x: worldX, minY: height + 1, maxY: WATER_LEVEL - 1 });
+          }
         }
 
         if (height > WATER_LEVEL + 1 && (x > 2 && x < CHUNK_SIZE - 2 && z > 2 && z < CHUNK_SIZE - 2)) {
@@ -59,6 +69,15 @@ export class Chunk {
       }
     }
 
+    // Gerar Algas (Kelp)
+    for (const kelp of kelpPositions) {
+      const kelpHeight = Math.floor(1 + Math.random() * (kelp.maxY - kelp.minY));
+      for (let y = 0; y < kelpHeight; y++) {
+        this.blocksData.set(`${kelp.x},${kelp.minY + y},${kelp.z}`, 'kelp');
+      }
+    }
+
+    // Gerar Árvores
     for (const tree of treePositions) {
       const trunkHeight = 4 + Math.floor(Math.random() * 2);
       for (let y = 0; y < trunkHeight; y++) {
@@ -91,7 +110,7 @@ export class Chunk {
   buildMesh() {
     this.clearMesh();
 
-    const blocksByType = { grass: [], dirt: [], stone: [], log: [], leaves: [], water: [] };
+    const blocksByType = { grass: [], dirt: [], stone: [], sand: [], kelp: [], log: [], leaves: [], water: [] };
 
     for (const [key, type] of this.blocksData.entries()) {
       const [x, y, z] = key.split(',').map(Number);
@@ -105,7 +124,7 @@ export class Chunk {
     else if (this.lodState === 2) matSet = solidMaterials;
 
     const dummy = new THREE.Object3D();
-    const typesOrder = ['dirt', 'stone', 'grass', 'log', 'leaves', 'water'];
+    const typesOrder = ['dirt', 'stone', 'sand', 'grass', 'kelp', 'log', 'leaves', 'water'];
 
     for (const type of typesOrder) {
       const list = blocksByType[type];
@@ -119,7 +138,7 @@ export class Chunk {
       imesh.receiveShadow = (this.lodState === 0);
 
       if (type === 'water') {
-        imesh.renderOrder = 2; // Renderizado por cima para manter a superfície limpa
+        imesh.renderOrder = 2;
       }
 
       for (let i = 0; i < list.length; i++) {

@@ -35,16 +35,11 @@ export class WorldManager {
 
         const chunkDistance = Math.max(Math.abs(x), Math.abs(z));
         
-        // Define o nível de textura baseado na distância do jogador:
-        // 0 = Chunk atual do jogador (Texturas HD com Sombras)
-        // 1 = Chunks vizinhas (Texturas SD)
-        // 2 = Chunks distantes (Cor sólida)
-        let lodLevel = 2;
+        let lodLevel = 1;
         if (chunkDistance === 0) {
           lodLevel = 0;
           hdCount++;
-        } else if (chunkDistance === 1) {
-          lodLevel = 1;
+        } else {
           sdCount++;
         }
 
@@ -71,7 +66,7 @@ export class WorldManager {
       statsElem.innerHTML = 
         `Chunk Atual: [${currentChunkX}, ${currentChunkZ}]<br>` +
         `🌟 Chunk HD (Atual): <b>${hdCount}</b><br>` +
-        `🎨 Chunks SD (Vizinhas): <b>${sdCount}</b><br>` +
+        `🎨 Chunks Vizinhos (Água Fluida): <b>${sdCount}</b><br>` +
         `📦 Total na GPU: <b>${this.loadedChunks.size} chunks</b>`;
     }
   }

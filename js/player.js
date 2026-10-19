@@ -70,17 +70,16 @@ export class Player {
   }
 
   update(delta) {
-    // Detecção da água na posição atual
-    const currentBlock = this.world.getBlock(
+    // Checa a presença de água diretamente na posição da cabeça/olhos
+    const headBlock = this.world.getBlock(
       Math.floor(this.position.x),
-      Math.floor(this.position.y - 0.5),
+      Math.floor(this.position.y),
       Math.floor(this.position.z)
     );
 
-    this.isSubmerged = (currentBlock === 'water') || (this.position.y < WATER_LEVEL + 0.5);
+    this.isSubmerged = (headBlock === 'water') && (this.position.y < WATER_LEVEL + 0.2);
 
     if (this.isSubmerged) {
-      // --- FÍSICA DE NATAÇÃO DINÂMICA 3D ---
       const swimSpeed = this.moveKeys.run ? 9 : 5.5;
       const moveDir = new THREE.Vector3();
 
@@ -91,7 +90,6 @@ export class Player {
 
       moveDir.normalize();
 
-      // Direção da natação orientada pela câmara (inclui mergulho ao olhar para baixo/cima)
       const lookVector = new THREE.Vector3(0, 0, -1);
       lookVector.applyAxisAngle(new THREE.Vector3(1, 0, 0), this.pitchObject.rotation.x);
       lookVector.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yawObject.rotation.y);
@@ -99,23 +97,19 @@ export class Player {
       if (this.moveKeys.forward) {
         this.velocity.lerp(lookVector.multiplyScalar(swimSpeed), delta * 4);
       } else {
-        // Amortecimento hidráulico (atrito na água)
         this.velocity.x *= Math.pow(0.05, delta);
         this.velocity.z *= Math.pow(0.05, delta);
       }
 
-      // Controlo vertical e empuxo na água
       if (this.moveKeys.jump) {
-        this.velocity.y = 5; // Subir
+        this.velocity.y = 5;
       } else if (!this.moveKeys.forward) {
-        // Flutuação natural
         this.velocity.y = Math.sin(Date.now() * 0.003) * 0.4;
       }
 
       this.velocity.y *= Math.pow(0.1, delta);
 
     } else {
-      // --- FÍSICA DE TERRA FIRME ---
       const speed = this.moveKeys.run ? 11 : 6;
       const moveDir = new THREE.Vector3();
 
@@ -130,7 +124,6 @@ export class Player {
       this.velocity.x = moveDir.x * speed;
       this.velocity.z = moveDir.z * speed;
 
-      // Gravidade
       this.velocity.y -= 26 * delta;
 
       if (this.moveKeys.jump && this.isGrounded) {
@@ -139,12 +132,10 @@ export class Player {
       }
     }
 
-    // Aplicação da Posição
     this.position.x += this.velocity.x * delta;
     this.position.z += this.velocity.z * delta;
     this.position.y += this.velocity.y * delta;
 
-    // Colisão com terreno sólido
     const feetBlock = this.world.getBlock(
       Math.floor(this.position.x),
       Math.floor(this.position.y - 1.5),
